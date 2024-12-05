@@ -8,10 +8,11 @@
 	KeyReleaseMask equ 2h
 	
 	nl db 0xA, 0
-	
+	failed_backbuffer_create db "Failed to create backbuffer", 0
 	
 	display dq 0
 	window dq 0
+	backbuffer dq 0
 	root_w dq 0
 	quit db 0
 	gc dq 0
@@ -19,6 +20,8 @@
 	y_coord_top dq 0             ;Initial y - coordinates for top pad
 	x_coord_bot dq 0             ;Initial x - coordinates for bot pad
 	y_coord_bot dq 0             ;Initial y - coordinates for bot pad
+	window_W dq 640              ;Window width
+	window_H dq 480              ;Window height
 	
 	
 event:
@@ -35,7 +38,7 @@ event:
 	extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
 	extern XPending, XClearWindow
-	extern draw_pad, init_window
+	extern draw_pad, init_window, create_backbuffer, swap_buffers, clear
 	
 strlen:
 	mov rax, 0
@@ -75,8 +78,6 @@ error:
 	
 _start:
 	
-	; RDI = Display output pointer
-	; RSi = Window output pointer
 	mov rdi, display
 	mov rsi, window
 	call init_window
@@ -97,6 +98,12 @@ _start:
 	mov rdx, KeyPressMask
 	call XSelectInput
 	
+	call create_backbuffer
+	test rax, rax
+	mov rdi, failed_backbuffer_create
+	jz error
+	mov [backbuffer], rax
+	
 @handle_keystroke:
 	
 	
@@ -116,6 +123,12 @@ _start:
 	jmp @do_events
 	
 @main_loop:
+	mov rdi, [display]
+	mov rsi, [gc]
+	mov rdx, [backbuffer]
+	mov rcx, [window_W]
+	mov r8, [window_H]
+	call clear
 	
 	
 @do_events:
@@ -137,16 +150,12 @@ _start:
 	
 	jmp @do_events               ; Continue processing events
 @do_events_end:
-	mov rdi, [display]           ;Display
-	mov rsi, [window]            ;Window
-	call XClearWindow            ;Clear window before redraw
 	
-	
-	mov rdi, [x_coord_bot]
+	mov rdi, [x_coord_top]
 	mov rsi, [y_coord_bot]
 	mov rdx, [gc]
 	mov rcx, [display]
-	mov r8, [window]
+	mov r8, [backbuffer]
 	call draw_pad
 	
 	;Flush screen to redraw
@@ -158,6 +167,10 @@ _start:
 	; Flush to ensure rectangle is drawn
 	mov rdi, [display]
 	call XFlush
+	
+	mov rdi, [backbuffer]
+	mov rsi, [gc]
+	call swap_buffers
 	
 	
 	jmp @main_loop

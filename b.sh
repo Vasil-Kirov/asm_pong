@@ -1,6 +1,6 @@
 #!/bin/bash
 
-files=('main.asm' 'init.asm' 'draw.asm')
+files=('main.asm' 'x11.asm' 'draw.asm')
 obj_str=''
 
 pushd bin

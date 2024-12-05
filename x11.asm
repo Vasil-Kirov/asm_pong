@@ -17,18 +17,21 @@ section .bss
 
 
 section .text
-	global init_window, create_image
+	global init_window, create_backbuffer, swap_buffers
 	extern XOpenDisplay, XCreateSimpleWindow, XCloseDisplay, XMapWindow
     extern XDefaultRootWindow, XInternAtom, XSetWMProtocols, XNextEvent
     extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
 	extern XPending, XClearWindow
+	extern XDefaultDepth, XCreatePixmap, XCopyArea
 	extern error
 	
 call_error:
 	push rbp
 	call error
 
+	; RDI = Output pointer for display
+	; RSI = Output pointer for window
 init_window:
 	push rbp
 	mov rbp, rsp
@@ -95,4 +98,52 @@ init_window:
 	ret
 	
 	
-create_image:
+; No arguments
+; RAX = backbuffer
+create_backbuffer:
+	push rbp
+	mov rbp, rsp
+	
+	mov rdi, [display]
+	mov rsi, 0
+	call XDefaultDepth
+	
+	mov rdi, [display]
+	mov rsi, [window]
+	mov rdx, [window_W]
+	mov rcx, [window_H]
+	mov r8, rax
+	call XCreatePixmap
+
+
+	mov rsp, rbp
+	pop rbp
+	ret
+	
+	
+; RDI = backbuffer
+; RSI = GC
+swap_buffers:
+	push rbp
+	mov rbp, rsp
+	
+	mov rcx, rsi	; GC
+	mov rsi, rdi	; pixmap
+	mov rdi, [display]
+	mov rdx, [window]
+	mov r8, 0
+	mov r9, 0
+	mov rax, 0
+	push rax
+	push rax
+	mov rax, [window_H]
+	push rax
+	mov rax, [window_W]
+	push rax
+	call XCopyArea
+	add rsp, 32
+	
+	mov rsp, rbp
+	pop rbp
+	ret
+
