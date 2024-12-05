@@ -1,16 +1,17 @@
 #!/bin/bash
 
-files=('main.s' 'pixel.s')
+files=('main.asm' 'init.asm' 'draw.asm')
 obj_str=''
-
 
 pushd bin
 for file in ${files[@]}; do
 	obj=$file'.o'
-	nasm -f elf64 '../'$file -o$obj
+	nasm -f elf64 -g -F dwarf '../'$file -o$obj
 	obj_str+=$obj' '
 done
 
-ld $obj_str --dynamic-linker /lib64/ld-linux-x86-64.so.2 -lX11 -o a.out
+
+ld -e _start -o a --dynamic-linker=/lib64/ld-linux-x86-64.so.2 $obj_str -lX11
+
 popd
 

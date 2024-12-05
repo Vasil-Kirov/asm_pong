@@ -1,0 +1,52 @@
+main
+
+#import io
+
+struct Display {}
+struct Window {}
+struct GC {}
+union XEvent {
+    type: i32,
+    pad: [24]int,
+}
+
+
+XOpenDisplay        :: fn #foreign(name: ?*) -> ?*Display;
+XDefaultRootWindow  :: fn #foreign(display: *Display) -> *Window;
+XCreateSimpleWindow :: fn #foreign(display: *Display, root: *Window, x: u32, y: u32, w: u32, h: u32, b_w: u32, b_color: u32, background: u32) -> *Window;
+XMapWindow      :: fn #foreign(display: *Display, window: *Window);
+XStoreWindow    :: fn #foreign(name: cstring);
+XPending        :: fn #foreign(display: *Display) -> u32;
+XNextEvent      :: fn #foreign(display: *Display, event: *XEvent) -> u32;
+XDrawRectangle  :: fn #foreign(display: *Display, drawable: *, gc: *GC, x: i32, y: i32, w: u32, h: u32) -> u32;
+XDefaultGC      :: fn #foreign(display: *Display, screen: i32) -> *GC; 
+
+main :: fn() -> i32 {
+    md := XOpenDisplay(null);
+    if md == null {
+        io.println("Failed to open display");
+        return 1;
+    }
+    d := ?md;
+    rw := XDefaultRootWindow(d);
+    w := XCreateSimpleWindow(d, rw, 100, 100, 640, 480, 0, 0, 0xCCCCCCFF);
+    XMapWindow(d, w);
+
+    running := true;
+    for running {
+        for XPending(d) > 0 {
+            e: XEvent;
+            if XNextEvent(d, &e) == 0 running = false;
+        }
+        XDrawRectangle(d, w, XDefaultGC(d, 0), 50, 50, 100, 150);
+    }
+
+    return 0;
+}
+
+
+
+
+
+
+

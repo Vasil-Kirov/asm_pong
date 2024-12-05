@@ -1,0 +1,11 @@
+build
+
+#import compile as c
+
+compile :: fn() -> c.CompileInfo {
+	return c.CompileInfo {
+		files = []string {"main.rcp"},
+		flags = @u32 c.CompileFlag.NoStdLib
+	};
+}
+
