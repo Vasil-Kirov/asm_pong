@@ -17,7 +17,7 @@ section .bss
 
 
 section .text
-	global init_window
+	global init_window, create_image
 	extern XOpenDisplay, XCreateSimpleWindow, XCloseDisplay, XMapWindow
     extern XDefaultRootWindow, XInternAtom, XSetWMProtocols, XNextEvent
     extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
@@ -94,3 +94,5 @@ init_window:
 	pop rbp
 	ret
 	
+	
+create_image:
