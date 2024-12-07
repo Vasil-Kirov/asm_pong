@@ -3,12 +3,14 @@
 	endstruc
 	
 	section .data
-
-	KeyPressMask equ 1h
-	KeyReleaseMask equ 2h
+		
+		KeyPressMask equ 1h
+		KeyReleaseMask equ 2h
 	
 	nl db 0xA, 0
 	failed_backbuffer_create db "Failed to create backbuffer", 0
+	prs db "pres", 0
+	rls db "rels", 0
 	
 	display dq 0
 	window dq 0
@@ -16,12 +18,21 @@
 	root_w dq 0
 	quit db 0
 	gc dq 0
-	x_coord_top dq 200           ;Initial x - coordinates for top pad
-	y_coord_top dq 0             ;Initial y - coordinates for top pad
-	x_coord_bot dq 0             ;Initial x - coordinates for bot pad
-	y_coord_bot dq 0             ;Initial y - coordinates for bot pad
+	x_coord_left dq 0            ;Initial x - coordinates for top pad
+	y_coord_left dq 0            ;Initial y - coordinates for top pad
+	pad_width dq 20              ;Pad width
+	pad_height dq 100            ;Pad height
+	x_coord_right dq 620         ;Initial x - coordinates for bot pad
+	y_coord_right dq 0           ;Initial y - coordinates for bot pad
+	ball_size dq 20              ;Size of the Ball
+	x_coord_ball dq 310          ;Ball x - coordinates
+	y_coord_ball dq 230          ;Ball y - coordinates
 	window_W dq 640              ;Window width
 	window_H dq 480              ;Window height
+	left_pad_UP_pressed dq 0     ;Stores state of left pad UP keybind
+	left_pad_DOWN_pressed dq 0   ;Stores state of left pad UP keybing
+	right_pad_UP_pressed db 0    ;Stores state of left pad UP keybind
+	right_pad_DOWN_pressed db 0  ;Stores state of left pad UP keybing
 	
 	
 event:
@@ -38,7 +49,7 @@ event:
 	extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
 	extern XPending, XClearWindow
-	extern draw_pad, init_window, create_backbuffer, swap_buffers, clear
+	extern draw_pad, draw_ball, init_window, create_backbuffer, swap_buffers, clear
 	
 strlen:
 	mov rax, 0
@@ -95,7 +106,8 @@ _start:
 	; RDX = Event mask
 	mov rdi, [display]           ; Display
 	mov rsi, [window]            ; Window
-	mov rdx, KeyPressMask
+	mov rdx, 3
+	;or rdx, 3
 	call XSelectInput
 	
 	call create_backbuffer
@@ -103,22 +115,120 @@ _start:
 	mov rdi, failed_backbuffer_create
 	jz error
 	mov [backbuffer], rax
-	
-@handle_keystroke:
-	
-	
-	;This should check if the key pressed is D, but doesn't work
-	
+	jmp @main_loop
+
+@handle_key_pressed:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, prs
+	mov rdx, 4
+	syscall
+
 	mov eax, [event + 84]        ; Load keycode from the XKeyEvent structure
 	
-	cmp rax, 40                  ; Compare with keycode for 'D'
-	jne @do_events               ; If not 'D', continue to next event
+	cmp rax, 39                  ; Compare with keycode for 'S'
+	je .L_DOWN
+	
+	cmp rax, 25                  ; Compare with keycode for 'W'
+	je .L_UP
+	
+	cmp rax, 116                 ; Compare with keycode for 'DOWN'
+	je .R_DOWN
+	
+	cmp rax, 111                 ; Compare with keycode for 'UP'
+	je .R_UP
+	
+	jmp @do_events
+	
+.R_DOWN:
+ test qword [right_pad_DOWN_pressed], 1
+    jnz @do_events_end                ; If already pressed, do nothing
+	mov qword[right_pad_DOWN_pressed], 1 ;Set state to pressed
+	jmp @do_events_end
+.R_UP:
+ test qword [right_pad_UP_pressed], 1
+    jnz @do_events_end                ; If already pressed, do nothing
+	mov qword[right_pad_UP_pressed], 1 ;Set state to pressed
+	jmp @do_events_end
+.L_DOWN:
+ test qword [left_pad_DOWN_pressed], 1
+    jnz @do_events_end                ; If already pressed, do nothing
+	mov qword[left_pad_DOWN_pressed], 1 ;Set state to pressed
+	jmp @do_events_end
+.L_UP:
+ test qword [left_pad_UP_pressed], 1
+    jnz @do_events_end               ; If already pressed, do nothing
+	mov qword[left_pad_UP_pressed], 1 ;Set state to pressed
+	jmp @do_events_end
 	
 	
-	; Key 'D' pressed, increment x_coord_top
-	add qword [x_coord_top], 5
+@handle_key_released:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, rls
+	mov rdx, 4
+	syscall
+	mov eax, [event + 84]        ; Load keycode from the XKeyEvent structure
 	
-
+	cmp rax, 39                  ; Compare with keycode for 'S'
+	je .L_DOWN
+	
+	cmp rax, 25                  ; Compare with keycode for 'W'
+	je .L_UP
+	
+	cmp rax, 116                 ; Compare with keycode for 'DOWN'
+	je .R_DOWN
+	
+	cmp rax, 111                 ; Compare with keycode for 'UP'
+	je .R_UP
+	
+	jmp @do_events
+	
+.R_DOWN:             ; If already pressed, do nothing
+	mov qword[right_pad_DOWN_pressed], 0 ;Set state to pressed
+	jmp @do_events_end
+.R_UP:           ; If already pressed, do nothing
+	mov qword[right_pad_UP_pressed], 0 ;Set state to pressed
+	jmp @do_events_end
+.L_DOWN:        ; If already pressed, do nothing
+	mov qword[left_pad_DOWN_pressed], 0 ;Set state to pressed
+	jmp @do_events_end
+.L_UP:             ; If already pressed, do nothing
+	mov qword[left_pad_UP_pressed], 0 ;Set state to pressed
+	jmp @do_events_end
+	
+	
+@move_down_left:
+	; Key 'S' pressed, increment y_coord_left
+	mov rax, [y_coord_left]
+	add rax, [pad_height]
+	cmp rax, [window_H]          ;Check if out of bounds
+	jae @do_events
+	add qword [y_coord_left], 5  ;Increment if not out of bounds
+	
+	jmp @do_events
+	
+@move_up_left:
+	cmp qword[y_coord_left], 0   ;Check if out of bounds
+	jbe @do_events
+	sub qword[y_coord_left], 5   ;Decrement if not out of bounds
+	
+	jmp @do_events
+	
+@move_down_right:
+	; Key 'S' pressed, increment y_coord_left
+	mov rax, [y_coord_right]
+	add rax, [pad_height]
+	cmp rax, [window_H]          ;Check if out of bounds
+	jae @do_events
+	add qword [y_coord_right], 5 ;Increment if not out of bounds
+	
+	jmp @do_events
+	
+@move_up_right:
+	cmp qword[y_coord_right], 0  ;Check if out of bounds
+	jbe @do_events
+	sub qword[y_coord_right], 5  ;Decrement if not out of bounds
 	
 	jmp @do_events
 	
@@ -140,23 +250,58 @@ _start:
 	mov rdi, [display]
 	mov rsi, event
 	call XNextEvent              ; Get the next event
-	
-	mov eax, [event]             ; Load the event type
-	cmp eax, 2                   ; Check for KeyPress event
-	jne @do_events               ; If not KeyPress, continue to next event
-	
-	jmp @handle_keystroke        ; If KeyPress, go handle it
-	
+		
+		mov eax, [event]             ; Load the event type
+		cmp eax, 2                   ; Check for KeyPress event
+		je @handle_key_pressed       ; If KeyPress, go handle it
+		
+		cmp eax, 3                   ; Check for KeyRelease event
+		je @handle_key_released      ; If KeyRelease, go handle it
 	
 	jmp @do_events               ; Continue processing events
 @do_events_end:
 	
-	mov rdi, [x_coord_top]
-	mov rsi, [y_coord_bot]
+	mov rax, [left_pad_DOWN_pressed]
+	cmp rax, 1
+	je @move_down_left
+	
+	mov rax, [left_pad_UP_pressed]
+	cmp rax, 1
+	je @move_up_left
+	
+	mov rax, [right_pad_DOWN_pressed]
+	cmp rax, 1
+	je @move_down_right
+	
+	mov rax, [right_pad_UP_pressed]
+	cmp rax, 1
+	je @move_up_right
+	
+	;Draw the left pad
+	mov rdi, [x_coord_left]
+	mov rsi, [y_coord_left]
 	mov rdx, [gc]
 	mov rcx, [display]
 	mov r8, [backbuffer]
 	call draw_pad
+	
+	
+	;Draw the right pad
+	mov rdi, [x_coord_right]
+	mov rsi, [y_coord_right]
+	mov rdx, [gc]
+	mov rcx, [display]
+	mov r8, [backbuffer]
+	call draw_pad
+	
+	
+	;Draw the ball
+	mov rdi, [x_coord_ball]
+	mov rsi, [y_coord_ball]
+	mov rdx, [gc]
+	mov rcx, [display]
+	mov r8, [backbuffer]
+	call draw_ball
 	
 	;Flush screen to redraw
 	mov rdi, [display]
