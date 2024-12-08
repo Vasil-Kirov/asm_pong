@@ -14,6 +14,7 @@ section .bss
 	root_w resq 1
 	out_dispay resq 1
 	out_window resq 1
+	dummy resq 1
 
 
 section .text
@@ -22,7 +23,7 @@ section .text
     extern XDefaultRootWindow, XInternAtom, XSetWMProtocols, XNextEvent
     extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
-	extern XPending, XClearWindow
+	extern XPending, XClearWindow, XkbSetDetectableAutoRepeat
 	extern XDefaultDepth, XCreatePixmap, XCopyArea
 	extern error
 	
@@ -84,6 +85,11 @@ init_window:
 	mov rsi, [window]
 	mov rdx, w_name
 	call XStoreName              ;Set window name
+
+	mov rdi, [display]
+	mov rsi, 1
+	mov rdx, dummy
+	call XkbSetDetectableAutoRepeat
 	
 	mov rax, [out_dispay]
 	mov rdi, [display]
@@ -93,7 +99,7 @@ init_window:
 	mov rdi, [window]
 	mov [rax], rdi
 
-    mov rsp, rbp
+	mov rsp, rbp
 	pop rbp
 	ret
 	
