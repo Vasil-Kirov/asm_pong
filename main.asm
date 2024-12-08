@@ -58,13 +58,14 @@ time_struc:
 section .text
 	
 	
-	global _start, error
+	global _start, error, print, println, print_with_num
 	extern XOpenDisplay, XCreateSimpleWindow, XCloseDisplay, XMapWindow
 	extern XDefaultRootWindow, XInternAtom, XSetWMProtocols, XNextEvent
 	extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
 	extern XPending, XClearWindow, XEventsQueued
 	extern draw_pad, draw_ball, init_window, create_backbuffer, swap_buffers, clear
+	extern init_logic, update_movement
 
 
 ; Result(RAX) = time in nano seconds
@@ -262,6 +263,15 @@ _start:
 	mov rdi, display
 	mov rsi, window
 	call init_window
+
+
+	mov rdi, [x_coord_left]
+	mov rsi, [y_coord_left]
+	mov rdx, [x_coord_right]
+	mov rcx, [y_coord_right]
+	mov r8,  [x_coord_ball]
+	mov r9,  [y_coord_ball]
+	call init_logic
 	
 	mov rdi, [display]
 	mov rsi, 0
@@ -359,6 +369,7 @@ _start:
 	mov rcx, [window_W]
 	mov r8, [window_H]
 	call clear
+
 	
 	
 @do_events:
@@ -386,6 +397,14 @@ _start:
 	call move_up_left
 	call move_down_right
 	call move_up_right
+
+	mov rdi, x_coord_ball
+	mov rsi, y_coord_ball
+	mov rdx, [x_coord_left]
+	mov rcx, [y_coord_left]
+	mov r8, [x_coord_right]
+	mov r9, [y_coord_right]
+	call update_movement
 	
 	;Draw the left pad
 	mov rdi, [x_coord_left]
