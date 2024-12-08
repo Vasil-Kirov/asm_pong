@@ -138,26 +138,18 @@ _start:
 	cmp rax, 111                 ; Compare with keycode for 'UP'
 	je .R_UP
 	
-	jmp @do_events
+	jmp @do_events_end
 	
 .R_DOWN:
- test qword [right_pad_DOWN_pressed], 1
-    jnz @do_events_end                ; If already pressed, do nothing
 	mov qword[right_pad_DOWN_pressed], 1 ;Set state to pressed
 	jmp @do_events_end
 .R_UP:
- test qword [right_pad_UP_pressed], 1
-    jnz @do_events_end                ; If already pressed, do nothing
 	mov qword[right_pad_UP_pressed], 1 ;Set state to pressed
 	jmp @do_events_end
 .L_DOWN:
- test qword [left_pad_DOWN_pressed], 1
-    jnz @do_events_end                ; If already pressed, do nothing
 	mov qword[left_pad_DOWN_pressed], 1 ;Set state to pressed
 	jmp @do_events_end
 .L_UP:
- test qword [left_pad_UP_pressed], 1
-    jnz @do_events_end               ; If already pressed, do nothing
 	mov qword[left_pad_UP_pressed], 1 ;Set state to pressed
 	jmp @do_events_end
 	
@@ -182,11 +174,11 @@ _start:
 	cmp rax, 111                 ; Compare with keycode for 'UP'
 	je .R_UP
 	
-	jmp @do_events
+	jmp @do_events_end
 	
 .R_DOWN:             ; If already pressed, do nothing
 	mov qword[right_pad_DOWN_pressed], 0 ;Set state to pressed
-	jmp @do_events_end
+	jmp @do_events_end	
 .R_UP:           ; If already pressed, do nothing
 	mov qword[right_pad_UP_pressed], 0 ;Set state to pressed
 	jmp @do_events_end
@@ -206,14 +198,14 @@ _start:
 	jae @do_events
 	add qword [y_coord_left], 5  ;Increment if not out of bounds
 	
-	jmp @do_events
+	jmp @1_
 	
 @move_up_left:
 	cmp qword[y_coord_left], 0   ;Check if out of bounds
 	jbe @do_events
 	sub qword[y_coord_left], 5   ;Decrement if not out of bounds
 	
-	jmp @do_events
+	jmp @2_
 	
 @move_down_right:
 	; Key 'S' pressed, increment y_coord_left
@@ -222,15 +214,15 @@ _start:
 	cmp rax, [window_H]          ;Check if out of bounds
 	jae @do_events
 	add qword [y_coord_right], 5 ;Increment if not out of bounds
-	
-	jmp @do_events
+
+	jmp @3_
 	
 @move_up_right:
 	cmp qword[y_coord_right], 0  ;Check if out of bounds
 	jbe @do_events
 	sub qword[y_coord_right], 5  ;Decrement if not out of bounds
 	
-	jmp @do_events
+	jmp @4_
 	
 @main_loop:
 	mov rdi, [display]
@@ -258,25 +250,25 @@ _start:
 		cmp eax, 3                   ; Check for KeyRelease event
 		je @handle_key_released      ; If KeyRelease, go handle it
 	
-	jmp @do_events               ; Continue processing events
+	;jmp @do_events               ; Continue processing events
 @do_events_end:
 	
 	mov rax, [left_pad_DOWN_pressed]
 	cmp rax, 1
 	je @move_down_left
-	
+@1_:	
 	mov rax, [left_pad_UP_pressed]
 	cmp rax, 1
 	je @move_up_left
-	
+@2_:		
 	mov rax, [right_pad_DOWN_pressed]
 	cmp rax, 1
 	je @move_down_right
-	
+@3_:		
 	mov rax, [right_pad_UP_pressed]
 	cmp rax, 1
 	je @move_up_right
-	
+@4_:		
 	;Draw the left pad
 	mov rdi, [x_coord_left]
 	mov rsi, [y_coord_left]
