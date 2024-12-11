@@ -9,8 +9,12 @@ section .data
 	initial_velocity dd 3.2
 	pad_width dq 20              ;Pad width
 	pad_height dq 100            ;Pad height
+	half_pad_height dq 50
+	half_pad_height_fl dd 50.0
 	got_collision db "Detected Collision", 0
 	direction_msg db "Direction: ", 0
+	max_angle dd  -75.0
+	constant_180 dd 180.0
 
 
 section .bss
@@ -474,8 +478,19 @@ update_movement:
 	jz .no_left_collision
 
 	; Got a collision, invert ball direction
-	mov edi, dword [ball_direction]
-	sub edi, 180
+	mov rsi, [rbp-32];Pad Y
+	mov rdi, [half_pad_height];Pad height
+	mov rbx, [rbp-64];New ball coord
+	add rdi, rsi
+	sub rdi, rbx ;relativeIntersectY  Y
+	mov rax, rdi
+	xor rdx, rdx
+	cvtsi2ss xmm1, rdi
+	movd xmm2, [half_pad_height_fl];The pad height, but float
+	divss xmm1, xmm2 
+	movd xmm2, [max_angle]
+	mulss xmm1, xmm2;	
+	cvtss2si edi, xmm1
 	mov dword [ball_direction], edi
 	jmp .end
 
@@ -497,6 +512,46 @@ update_movement:
 	add r11, [pad_height]
 	call check_line_intersection
 	test rax, rax
+	jz .no_right_collision
+
+
+;;RIGHT NOW IS MIRRIORED. IT WOULD BE BETTER TO HAVE SPEEDX and SPEEDY instead of velocity and direction
+; Got a collision, invert ball direction
+	mov rsi, [rbp-48];Pad Y
+	mov rdi, [half_pad_height];Pad height
+	mov rbx, [rbp-64];New ball coord
+	add rdi, rsi
+	sub rdi, rbx ;relativeIntersectY  Y
+	mov rax, rdi
+	xor rdx, rdx
+	cvtsi2ss xmm1, rdi
+	movd xmm2, [half_pad_height_fl];The pad height, but float
+	divss xmm1, xmm2 
+	movd xmm2, [max_angle]
+	mulss xmm1, xmm2;
+	movss xmm3, [constant_180]   ; Load 180.0f into xmm3
+    addss xmm1, xmm3             ; Subtract xmm3 (180.0f) from xmm2
+	cvtss2si edi, xmm1
+	mov dword [ball_direction], edi
+	jmp .end
+
+
+.no_right_collision:
+	xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	; right pad line
+	mov r8, 0 ; p2_x
+	mov r9, 0 ; p2_y
+	mov r10, 640	 ; q2_x
+	mov r11, 0	 ; q2_y
+	call check_line_intersection
+	test rax, rax
 	jz .assign_new_position
 
 	; Got a collision, invert ball direction
@@ -504,6 +559,8 @@ update_movement:
 	sub edi, 180
 	mov dword [ball_direction], edi
 	jmp .end
+
+	
 
 	.assign_new_position:
 	mov rdi, [rbp-56]

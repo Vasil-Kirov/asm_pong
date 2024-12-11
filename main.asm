@@ -24,14 +24,14 @@
 	quit db 0
 	gc dq 0
 	x_coord_left dq 0            ;Initial x - coordinates for top pad
-	y_coord_left dq 0            ;Initial y - coordinates for top pad
+	y_coord_left dq 190            ;Initial y - coordinates for top pad
 	pad_width dq 20              ;Pad width
 	pad_height dq 100            ;Pad height
 	x_coord_right dq 620         ;Initial x - coordinates for bot pad
-	y_coord_right dq 0           ;Initial y - coordinates for bot pad
+	y_coord_right dq 190           ;Initial y - coordinates for bot pad
 	ball_size dq 20              ;Size of the Ball
 	x_coord_ball dq 310          ;Ball x - coordinates
-	y_coord_ball dq 230          ;Ball y - coordinates
+	y_coord_ball dq 240          ;Ball y - coordinates
 	window_W dq 640              ;Window width
 	window_H dq 480              ;Window height
 	left_pad_UP_pressed db 0     ;Stores state of left pad UP keybind
@@ -436,11 +436,6 @@ _start:
 	mov rdi, [display]
 	call XFlush
 	
-	
-	
-	; Flush to ensure rectangle is drawn
-	mov rdi, [display]
-	call XFlush
 	
 	mov rdi, [backbuffer]
 	mov rsi, [gc]
