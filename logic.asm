@@ -15,6 +15,10 @@ section .data
 	direction_msg db "Direction: ", 0
 	max_angle dd  -75.0
 	constant_180 dd 180.0
+	zero dd 0.0
+	one dd 1.0
+	neg_one dd -1.0
+	ten dd 4.0
 
 
 section .bss
@@ -25,11 +29,13 @@ section .bss
 	ball_size resb vec2_size
 	left_pad_pos resb vec2_size
 	right_pad_pos resb vec2_size
+	x_speed resd 1
+	y_speed resd 1
 
 
 
 section .text
-	global init_logic, update_movement
+	global init_logic, update_movement, restart_ball
 	extern sine, cosine, print, println, print_with_num
 
 
@@ -54,6 +60,13 @@ init_logic:
 
 	mov dword[ball_size + vec2.x], 10
 	mov dword[ball_size + vec2.y], 10
+
+	movd xmm0, [one]
+	movd dword[x_speed], xmm0
+
+
+	movd xmm0, [zero]
+	movd dword[y_speed], xmm0
 
 	
 	mov dword [ball_direction], 0
@@ -405,6 +418,163 @@ check_line_intersection:
 	pop rbp
 	ret
 
+collsion_scr:
+xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	;top line
+	mov r8, 0 ; p2_x
+	mov r9, 0 ; p2_y
+	mov r10, 640	 ; q2_x
+	mov r11, 0	 ; q2_y
+	call check_line_intersection
+	test rax, rax
+	jnz .collsion
+
+	xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	mov r8, 0 ; p2_x
+	mov r9, 480 ; p2_y
+	mov r10, 640	 ; q2_x
+	mov r11, 480	 ; q2_y
+	call check_line_intersection
+	test rax, rax
+	jz .end
+
+.collsion:
+	; Got a collision, invert ball direction
+	movd xmm0, [zero]
+	subss xmm0, [y_speed]
+	movd [y_speed], xmm0
+	mov rax, 1
+	.end:
+	ret
+
+collision_pad:
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	; left pad line
+	mov r8, [rbp-24] ; p2_x
+	mov r9, [rbp-32] ; p2_y
+	add r8, [pad_width] ; left pad compares the right side of it
+	mov r10, r8	 ; q2_x
+	mov r11, r9	 ; q2_y
+	add r11, [pad_height]
+	call check_line_intersection
+	mov rsi, [rbp-32];Pad Y
+	test rax, rax
+	jnz .left_collision
+
+	;Right pad collision check
+	xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	mov r8, [rbp-40] ; p2_x
+	mov r9, [rbp-48] ; p2_y
+	sub r8, [pad_width] ; idk why this is not stored like the left line
+	mov r10, r8	 ; q2_x
+	mov r11, r9	 ; q2_y
+	add r11, [pad_height]
+	call check_line_intersection
+	mov rsi, [rbp-48]
+	test rax, rax
+	jz .end
+	jmp .right_collision
+
+.left_collision:
+	jmp .collision
+
+.right_collision:
+	jmp .collision
+
+.collision:
+	mov rdi, [half_pad_height];Pad height
+	mov rbx, [rbp-64];New ball coord
+	add rdi, rsi
+	sub rdi, rbx ;relativeIntersectY  Y
+	mov rax, rdi
+	xor rdx, rdx
+	cvtsi2ss xmm1, rdi
+	movd xmm2, [half_pad_height_fl];The pad height, but float
+	divss xmm1, xmm2 
+	movd xmm2, [neg_one]
+	mulss xmm1, xmm2;
+	movd [y_speed], xmm1	
+	movd xmm3, [zero]
+	subss xmm3, [x_speed]
+	movd [x_speed], xmm3	
+	mov rax, 1
+	.end:
+	ret
+
+collsion_void:
+	xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	;left line
+	mov r8, 1 ; p2_x
+	mov r9, 0 ; p2_y
+	mov r10, 0	 ; q2_x
+	mov r11, 480	 ; q2_y
+	call check_line_intersection
+	test rax, rax
+	jnz .collision_left
+
+	mov rax, -1
+	jmp .no
+
+	.collision_left:
+		jmp .end;
+	.no:
+
+	xor rdi, rdi
+	xor rsi, rsi
+	; line from the old position of the ball to the new one
+	mov edi, dword [ball_pos + vec2.x] ; p1_x
+	mov esi, dword [ball_pos + vec2.y] ; p1_y
+	mov rdx, [rbp-56] ; q1_x
+	mov rcx, [rbp-64] ; q1_y
+
+	mov r8, 640 ; p2_x
+	mov r9, 0 ; p2_y
+	mov r10, 640	 ; q2_x
+	mov r11, 480	 ; q2_y
+	call check_line_intersection
+	test rax, rax
+	mov rax, 0
+	jz .end
+	mov rax, 1
+
+	.end:
+	ret
+
+
+
 ; RDI=ball_x_out_ptr
 ; RSI=ball_y_out_ptr
 ; RDX=left_pad_x
@@ -424,26 +594,10 @@ update_movement:
 	mov [rbp-40], r8  ; right_pad_x
 	mov [rbp-48], r9  ; right_pad_y
 
-;	xor rdi, rdi
-;	mov edi, dword [ball_direction]
-;	mov rsi, rdi
-;	mov rdi, direction_msg
-;	call print_with_num
-
-	xor rdi, rdi
-	mov edi, dword [ball_direction]
-	call cosine
-	movaps xmm1, xmm0
-	call sine
-	; sine = xmm0
-	; cosine = xmm1
-
-
-	movd xmm2, [ball_velocity]
-	movaps xmm3, xmm2
-
-	mulss xmm2, xmm1 ; x_vel * cosine
-	mulss xmm3, xmm0 ; y_vel * sine
+	movd xmm2, [x_speed]
+	mulss xmm2, [ten]
+	movd xmm3, [y_speed]
+	mulss xmm3, [ten]
 
 	cvtss2si rdx, xmm2 ; +x
 	cvtss2si rcx, xmm3 ; +y
@@ -460,106 +614,18 @@ update_movement:
 
 	xor rdi, rdi
 	xor rsi, rsi
-	; line from the old position of the ball to the new one
-	mov edi, dword [ball_pos + vec2.x] ; p1_x
-	mov esi, dword [ball_pos + vec2.y] ; p1_y
-	mov rdx, [rbp-56] ; q1_x
-	mov rcx, [rbp-64] ; q1_y
-
-	; left pad line
-	mov r8, [rbp-24] ; p2_x
-	mov r9, [rbp-32] ; p2_y
-	add r8, [pad_width] ; left pad compares the right side of it
-	mov r10, r8	 ; q2_x
-	mov r11, r9	 ; q2_y
-	add r11, [pad_height]
-	call check_line_intersection
+	
+	call collsion_scr
 	test rax, rax
-	jz .no_left_collision
-
-	; Got a collision, invert ball direction
-	mov rsi, [rbp-32];Pad Y
-	mov rdi, [half_pad_height];Pad height
-	mov rbx, [rbp-64];New ball coord
-	add rdi, rsi
-	sub rdi, rbx ;relativeIntersectY  Y
-	mov rax, rdi
-	xor rdx, rdx
-	cvtsi2ss xmm1, rdi
-	movd xmm2, [half_pad_height_fl];The pad height, but float
-	divss xmm1, xmm2 
-	movd xmm2, [max_angle]
-	mulss xmm1, xmm2;	
-	cvtss2si edi, xmm1
-	mov dword [ball_direction], edi
-	jmp .end
-
-	.no_left_collision:
-	xor rdi, rdi
-	xor rsi, rsi
-	; line from the old position of the ball to the new one
-	mov edi, dword [ball_pos + vec2.x] ; p1_x
-	mov esi, dword [ball_pos + vec2.y] ; p1_y
-	mov rdx, [rbp-56] ; q1_x
-	mov rcx, [rbp-64] ; q1_y
-
-	; right pad line
-	mov r8, [rbp-40] ; p2_x
-	mov r9, [rbp-48] ; p2_y
-	sub r8, [pad_width] ; idk why this is not stored like the left line
-	mov r10, r8	 ; q2_x
-	mov r11, r9	 ; q2_y
-	add r11, [pad_height]
-	call check_line_intersection
+	mov rax, 0
+	jnz .end
+	call collision_pad
 	test rax, rax
-	jz .no_right_collision
-
-
-;;RIGHT NOW IS MIRRIORED. IT WOULD BE BETTER TO HAVE SPEEDX and SPEEDY instead of velocity and direction
-; Got a collision, invert ball direction
-	mov rsi, [rbp-48];Pad Y
-	mov rdi, [half_pad_height];Pad height
-	mov rbx, [rbp-64];New ball coord
-	add rdi, rsi
-	sub rdi, rbx ;relativeIntersectY  Y
-	mov rax, rdi
-	xor rdx, rdx
-	cvtsi2ss xmm1, rdi
-	movd xmm2, [half_pad_height_fl];The pad height, but float
-	divss xmm1, xmm2 
-	movd xmm2, [max_angle]
-	mulss xmm1, xmm2;
-	movss xmm3, [constant_180]   ; Load 180.0f into xmm3
-    addss xmm1, xmm3             ; Subtract xmm3 (180.0f) from xmm2
-	cvtss2si edi, xmm1
-	mov dword [ball_direction], edi
-	jmp .end
-
-
-.no_right_collision:
-	xor rdi, rdi
-	xor rsi, rsi
-	; line from the old position of the ball to the new one
-	mov edi, dword [ball_pos + vec2.x] ; p1_x
-	mov esi, dword [ball_pos + vec2.y] ; p1_y
-	mov rdx, [rbp-56] ; q1_x
-	mov rcx, [rbp-64] ; q1_y
-
-	; right pad line
-	mov r8, 0 ; p2_x
-	mov r9, 0 ; p2_y
-	mov r10, 640	 ; q2_x
-	mov r11, 0	 ; q2_y
-	call check_line_intersection
+	mov rax, 0
+	jnz .end
+	call collsion_void
 	test rax, rax
-	jz .assign_new_position
-
-	; Got a collision, invert ball direction
-	mov edi, dword [ball_direction]
-	sub edi, 180
-	mov dword [ball_direction], edi
-	jmp .end
-
+	jnz .end
 	
 
 	.assign_new_position:
@@ -575,7 +641,18 @@ update_movement:
 
 
 	.end:
+
+
 	mov rsp, rbp
 	pop rbp
+	ret
+
+	restart_ball:
+	mov dword[ball_pos + vec2.x], 310
+	mov dword[ball_pos + vec2.y], 240
+	movd xmm0, [one]
+	movd [x_speed], xmm0
+	movd xmm0, [zero]
+	movd [y_speed], xmm0
 	ret
 
