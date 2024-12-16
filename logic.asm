@@ -191,28 +191,28 @@ orientation:
     ;int val = (q.y - p.y) * (r.x - q.x) - 
     ;          (q.x - p.x) * (r.y - q.y); 
 
-	mov r10, rcx
-	sub r10, rsi
+	mov r10d, ecx
+	sub r10d, esi
 	; r10 = q.y-p.y
 
-	mov r11, r8
-	sub r11, rdx
+	mov r11d, r8d
+	sub r11d, edx
 	; r11 = r.x-q.x
 
-	mov r12, rdx
-	sub r12, rdi
+	mov r12d, edx
+	sub r12d, edi
 	; r12 = q.x-p.x
 
-	mov r13, r9
-	sub r13, rcx
+	mov r13d, r9d
+	sub r13d, ecx
 	; r13 = r.y-q.y
 
-	imul r10, r11
-	imul r12, r13
+	imul r10d, r11d
+	imul r12d, r13d
 	
-	sub r10, r12
+	sub r10d, r12d
 
-	cmp r10, 0
+	cmp r10d, 0
 	je .0
 	jg .1
 	jmp .2
@@ -481,8 +481,6 @@ collision_pad:
 	jnz .left_collision
 
 	;Right pad collision check
-	xor rdi, rdi
-	xor rsi, rsi
 	; line from the old position of the ball to the new one
 	mov edi, dword [ball_pos + vec2.x] ; p1_x
 	mov esi, dword [ball_pos + vec2.y] ; p1_y
@@ -495,6 +493,18 @@ collision_pad:
 	mov r10, r8	 ; q2_x
 	mov r11, r9	 ; q2_y
 	add r11, [pad_height]
+
+	
+	mov r12, rdi
+	mov r13, r8
+	sub r13, r12
+	cmp r13, 10000
+	ja .break
+	jmp .no_break
+.break:
+	jmp .no_break
+
+.no_break:
 	call check_line_intersection
 	mov rsi, [rbp-48]
 	test rax, rax
