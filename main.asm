@@ -15,8 +15,11 @@
 	failed_backbuffer_create db "Failed to create backbuffer", 0
 	prs db "pres", 0
 	rls db "rels", 0
-fps db "fps: ", 0
-	
+	fps db "fps: ", 0
+
+	left_score dq 0
+	right_score dq 0
+
 	display dq 0
 	window dq 0
 	backbuffer dq 0
@@ -64,8 +67,8 @@ time_struc:
 	extern XStoreName, XCreateGC, XDrawRectangle, XFillRectangle, XFlush
 	extern XDefaultGC, XSetForeground, XSetBackground, XDefaultScreen, XSelectInput
 	extern XPending, XClearWindow, XEventsQueued
-	extern draw_pad, draw_ball, init_window, create_backbuffer, swap_buffers, clear
-	extern init_logic, update_movement, restart_ball
+	extern draw_pad, draw_ball, init_window, create_backbuffer, swap_buffers, clear, draw_text
+	extern init_logic, update_movement, restart_ball, allocate_colors
 	
 	
 	; Result(RAX) = time in nano seconds
@@ -193,57 +196,69 @@ println:
 	mov rsp, rbp
 	pop rbp
 	ret
-	
-	; RDI = nullterminated string
-	; RSI = (unsigned) num
-print_with_num:
+
+	; RDI = num
+	; RSI = ptr with exactly 64 bytes allocated
+write_num_to_ptr:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 155
-	
-	mov [rbp - 8], rsi
-	call print
-	
-	mov rax, [rbp - 8]
-	mov rsi, 10
-	mov rdi, - 155
-	; [rbp - 155] - > [rbp - 8] buff
+	mov rax, rdi
+	mov rcx, 10
+	mov rdi, -64
+
 .1:
 	xor rdx, rdx
-	div rsi
+	div rcx
 	
 	; dl = remainder
 	add dl, 48                   ; + '0'
-	mov byte[rbp + rdi], dl
+	mov byte[rsi + rdi], dl
 	
 	inc rdi
 	cmp rax, 0
 	jne .1
 	
 	; Done, now null terminate it
-	mov byte[rbp + rdi], 0
+	mov byte[rsi + rdi], 0
 	
 	; Currently the number is in reverse (102 = 201)
-	mov rsi, - 155
+	mov rdx, -64
 	dec rdi
 	
 .2:
 	
-	mov al, byte[rbp + rdi]
-	mov bl, byte[rbp + rsi]
-	mov byte[rbp + rdi], bl
-	mov byte[rbp + rsi], al
+	mov al, byte[rsi + rdi]
+	mov bl, byte[rsi + rdx]
+	mov byte[rsi + rdi], bl
+	mov byte[rsi + rdx], al
 	
 	
 	dec rdi
 	inc rsi
-	cmp rdi, rsi
+	cmp rdi, rdx
 	jg .2
+
+	mov rsp, rbp
+	pop rbp
+	ret
+	
+	; RDI = nullterminated string
+	; RSI = (unsigned) num
+print_with_num:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 72
+	
+	mov [rbp - 8], rsi
+	call print
+	
+	mov rdi, [rbp - 8]
+	lea rsi, [rbp - 8]
+	call write_num_to_ptr
+	; [rbp - 72] - > [rbp - 8] buff
 	
 	
-	
-	
-	lea rdi, [rbp - 155]
+	lea rdi, [rbp - 72]
 	call println
 	
 	
@@ -252,7 +267,25 @@ print_with_num:
 	pop rbp
 	ret
 	
+; RAX score
 restart_game:
+	cmp rax, 1
+	je .left_score
+	jmp .right_score
+	
+	.left_score:
+		mov rax, [left_score]
+		inc rax
+		mov [left_score], rax
+		jmp .after_score
+
+	.right_score:
+		mov rax, [right_score]
+		inc rax
+		mov [right_score], rax
+
+	.after_score:
+
 	call restart_ball
 	mov qword[x_coord_left], 0            ;Initial x - coordinates for top pad
 	mov qword[y_coord_left], 190          ;Initial y - coordinates for top pad
@@ -268,6 +301,41 @@ error:
 	mov rax, 60                  ; sys_exit
 	mov rdi, 255                 ; error 255
 	syscall
+
+draw_scores:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 128
+
+	mov rdi, [left_score]
+	lea rsi, [rbp]
+	call write_num_to_ptr
+
+	lea rdi, [rbp-64]
+	call strlen
+
+	; rdi = x, rsi = y; rdx = char *text ;rcx = strlen
+	mov rdi, 160
+	mov rsi, 120
+	lea rdx, [rbp-64]
+	mov rcx, rax
+	call draw_text
+
+	mov rdi, [right_score]
+	lea rsi, [rbp-64]
+	call write_num_to_ptr
+	lea rdi, [rbp-128]
+	call strlen
+	; rdi = x, rsi = y; rdx = char *text ;rcx = strlen
+	mov rdi, 480
+	mov rsi, 120
+	lea rdx, [rbp-128]
+	mov rcx, rax
+	call draw_text
+	
+	mov rsp, rbp
+	pop rbp
+	ret
 	
 _start:
 	mov rdi, display
@@ -289,6 +357,10 @@ _start:
 	test rax, rax
 	jz error
 	mov [gc], rax
+
+	mov rdi, [display]
+	mov rsi, [gc] ; GC
+	call allocate_colors
 	
 	
 	call get_time
@@ -423,6 +495,9 @@ _start:
 		call restart_game
 
 	.dont:
+
+
+	call draw_scores
 	
 	;Draw the left pad
 	mov rdi, [x_coord_left]
@@ -491,7 +566,6 @@ _start:
 	mov rdi, fps
 	mov rsi, rax
 	call print_with_num
-	
 	
 	
 	jmp @main_loop

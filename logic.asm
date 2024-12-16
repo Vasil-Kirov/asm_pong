@@ -16,14 +16,14 @@ section .data
 	max_angle dd  -75.0
 	constant_180 dd 180.0
 	zero dd 0.0
+	point_zeroone dd 0.01
 	one dd 1.0
 	neg_one dd -1.0
-	ten dd 4.0
+	ball_velocity dd 1.0
 
 
 section .bss
 	ball_direction resd 1
-	ball_velocity resd 1
 
 	ball_pos resb vec2_size
 	ball_size resb vec2_size
@@ -478,7 +478,7 @@ collision_pad:
 	call check_line_intersection
 	mov rsi, [rbp-32];Pad Y
 	test rax, rax
-	jnz .left_collision
+	jnz .collision
 
 	;Right pad collision check
 	; line from the old position of the ball to the new one
@@ -494,28 +494,12 @@ collision_pad:
 	mov r11, r9	 ; q2_y
 	add r11, [pad_height]
 
-	
-	mov r12, rdi
-	mov r13, r8
-	sub r13, r12
-	cmp r13, 10000
-	ja .break
-	jmp .no_break
-.break:
-	jmp .no_break
-
-.no_break:
 	call check_line_intersection
 	mov rsi, [rbp-48]
 	test rax, rax
 	jz .end
-	jmp .right_collision
-
-.left_collision:
 	jmp .collision
 
-.right_collision:
-	jmp .collision
 
 .collision:
 	mov rdi, [half_pad_height];Pad height
@@ -547,20 +531,14 @@ collsion_void:
 	mov rcx, [rbp-64] ; q1_y
 
 	;left line
-	mov r8, 1 ; p2_x
+	mov r8, 0 ; p2_x
 	mov r9, 0 ; p2_y
 	mov r10, 0	 ; q2_x
 	mov r11, 480	 ; q2_y
 	call check_line_intersection
 	test rax, rax
-	jnz .collision_left
-
 	mov rax, -1
-	jmp .no
-
-	.collision_left:
-		jmp .end;
-	.no:
+	jnz .end
 
 	xor rdi, rdi
 	xor rsi, rsi
@@ -604,10 +582,14 @@ update_movement:
 	mov [rbp-40], r8  ; right_pad_x
 	mov [rbp-48], r9  ; right_pad_y
 
+	movd xmm0, [ball_velocity]
+	addss xmm0, [point_zeroone]
+	movd [ball_velocity], xmm0
+
 	movd xmm2, [x_speed]
-	mulss xmm2, [ten]
+	mulss xmm2, [ball_velocity]
 	movd xmm3, [y_speed]
-	mulss xmm3, [ten]
+	mulss xmm3, [ball_velocity]
 
 	cvtss2si rdx, xmm2 ; +x
 	cvtss2si rcx, xmm3 ; +y
@@ -664,5 +646,6 @@ update_movement:
 	movd [x_speed], xmm0
 	movd xmm0, [zero]
 	movd [y_speed], xmm0
+	movd [ball_velocity], xmm0
 	ret
 
